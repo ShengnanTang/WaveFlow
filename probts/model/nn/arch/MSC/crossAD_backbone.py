@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import math
 from einops import rearrange, repeat
-# 假设 ADWT_1D 在同级目录下或已正确导入
+
 from .ADWT_1D import ADWT_1D 
 from timm.models.vision_transformer import  Mlp
 from .Attention_Blocks import *
@@ -201,21 +201,18 @@ class AdaLNTransformerEncoderLayer(nn.Module):
         
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=-1)
 
-# 检查这些变量里是否有人的 shape 是空的，或者本该是标量却变成了向量
+
 
         x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa),attn_mask)[0]
 
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
 
         return x
-# =======================================================
-# 3. 核心：DTWSR 风格的扩散 Transformer (引入 AdaLN)
-# =======================================================
+
 class GatedFusion(nn.Module):
     def __init__(self, channels):
         super(GatedFusion, self).__init__()
-        # 使用 1x1 卷积学习门控权重
-        # 输入通道为 2*channels (因为拼接了两个输入)
+
         self.gate_conv = nn.Sequential(
             nn.Linear(2 * channels, channels),
             # nn.BatchNorm1d(channels),
@@ -223,7 +220,7 @@ class GatedFusion(nn.Module):
         )
 
     def forward(self, x1, x2):
-        # 1. 在通道维度拼接 [B, 2C, L]
+ 
         # x1 b c l 
         combined = torch.cat([x1, x2], dim=-2).permute(0,2,1) # b l c
 
@@ -269,7 +266,7 @@ class BackboneModel(nn.Module):
         # 2. 小波变换与 Patch 尺寸计算
         # -------------------------------------------------------------------------
         self.dwt = ADWT_1D(level=wavelet_level, learnable=False)
-        self.dwt1 = ADWT_1D(level=wavelet_level, learnable=False) # 副本或用于不同阶段
+        self.dwt1 = ADWT_1D(level=wavelet_level, learnable=False) 
 
         # 计算金字塔 Patch 尺寸 (LF, HF_J...HF_1)
         self.patch_sizes = [
@@ -278,9 +275,7 @@ class BackboneModel(nn.Module):
         ]
         print(f"Pyramid Patch Sizes: {self.patch_sizes}")
 
-        # -------------------------------------------------------------------------
-        # 3. 标记器 (Tokenizers / Embedding Layers)
-        # -------------------------------------------------------------------------
+  
         # 多尺度切片嵌入
         self.tokenizers = nn.ModuleList([
             patch_embedding(p, hidden_dim) for p in self.patch_sizes
@@ -291,9 +286,7 @@ class BackboneModel(nn.Module):
         self.lf_tokenizer  = patch_embedding(self.base_patch_size, hidden_dim)
         
 
-        # -------------------------------------------------------------------------
-        # 5. 解记号器 (Detokenizers / Projection Layers)
-        # -------------------------------------------------------------------------
+
         # 获取小波分解后的维度信息
         _, pse_hh = self.dwt._dummy_forward(self.total_length, is_dec=1)
         self._max_patch_num = self.get_max_patch_num(pse_hh=pse_hh)
@@ -309,11 +302,7 @@ class BackboneModel(nn.Module):
         self.feat_emb = LabelEmbedder(self.total_length * 3, hidden_size=hidden_dim)
         self.time_embedding = TimestepEmbedder(hidden_dim)
         
-        # self.latent_emb = LabelEmbedder(self._max_patch_num * hidden_dim,hidden_size=hidden_dim)
-        # -------------------------------------------------------------------------
-        # 4. Transformer 层 (Encoder/Decoder Layers)
-        # -------------------------------------------------------------------------
-        # 针对低频、高频和全局特征的独立 Transformer 块
+
         common_params = dict(
             hidden_size=hidden_dim, num_layers=1, nheads=nheads, mlp_ratio=mlp_ratio, attn_drop=attn_drop,proj_dropout=proj_dopr,
         )
@@ -435,62 +424,6 @@ class BackboneModel(nn.Module):
         return _max_patch_num
 
 
-    # def _make_mask(self, current_tokens, token_slices, mode='low'):
-    #     # ... (Mask logic remains the same) ...
-    #     device = current_tokens.device
-    #     total_len = current_tokens.size(1)
-    #     mask = torch.full((total_len, total_len), float('-inf'), device=device)
-        
-
-    #     sl_lr = token_slices['lr']
-    #     sl_lf = token_slices['lf']
-        
-
-    #     if mode == 'low':
-    #         # LR Block: 只能看 LR (防止由 Noisy LF 泄露信息给 Condition)
-    #         mask[sl_lr, sl_lr] = 0.0
-            
-    #         # LF Block: 可以看 LR + LF
-    #         mask[sl_lf, sl_lr] = 0.0 # LF sees LR
-    #         mask[sl_lf, sl_lf] = 0.0 # LF sees LF
-            
-
-    #     elif mode == 'high':
-    #         sl_hf_list = token_slices['hf_list'] # HF 切片列表
-            
-    #         # LR Block: 只能看 LR（不变）
-    #         mask[sl_lr, sl_lr] = 0.0
-            
-    #         # 改动核心：LF 不能关注 LR，仅能关注自身 + 所有 HF
-    #         # mask[sl_lf, sl_lf] = 0.0  # LF 自关注
-    #         # 合并所有 HF 的区间
-    #         hf_start = sl_hf_list[0].start
-    #         hf_end = sl_hf_list[-1].stop
-    #         sl_all_hf = slice(hf_start, hf_end)
-    #         mask[sl_lf, sl_all_hf] = 0.0  # LF 关注所有 HF
-
-    #         # 移除原逻辑：mask[sl_lf, sl_lr] = 0.0（禁止 LF 关注 LR）
-            
-    #         # HF Blocks: 规则不变（关注 LR + 所有 HF，屏蔽 LF）
-    #         hf_start = sl_hf_list[0].start
-    #         hf_end = sl_hf_list[-1].stop
-    #         sl_all_hf = slice(hf_start, hf_end)
-    #         mask[sl_all_hf, sl_lr] = 0.0
-    #         mask[sl_all_hf, sl_all_hf] = 0.0
-    #         mask[sl_all_hf, sl_lf] = 0.0
-
-    #     elif mode == 'causal':
-    #         l = total_len
-    #         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    #         mask = torch.full((l, l), float('-inf'), device=device)
-    #         mask  = torch.triu(mask, diagonal=1)
-            
-            
-    #         mask = mask.unsqueeze(0).unsqueeze(0)
-
-            
-    #     return mask
 
 
     def _make_mask(self, current_tokens, token_slices, mode='low'):
@@ -502,7 +435,6 @@ class BackboneModel(nn.Module):
         device = current_tokens.device
         total_len = current_tokens.size(1)
 
-        # 一开始：全部禁止（True）
         mask = torch.ones((total_len, total_len),
                         dtype=torch.bool,
                         device=device)
@@ -511,34 +443,34 @@ class BackboneModel(nn.Module):
         sl_lf = token_slices['lf']
 
         if mode == 'low':
-            # LR Block: 只能看 LR
+            
             mask[sl_lr, sl_lr] = False
 
-            # LF Block: 可以看 LR + LF
+            
             mask[sl_lf, sl_lr] = False
             mask[sl_lf, sl_lf] = False
 
         elif mode == 'high':
             sl_hf_list = token_slices['hf_list']
 
-            # LR Block: 只能看 LR
+            
             mask[sl_lr, sl_lr] = False
 
-            # 所有 HF 的连续区间
+            
             hf_start = sl_hf_list[0].start
             hf_end   = sl_hf_list[-1].stop
             sl_all_hf = slice(hf_start, hf_end)
 
-            # LF: 只能看 HF（不能看 LR，也不能看自己）
+           
             mask[sl_lf, sl_all_hf] = False
             
-            # HF: 可以看 LR + HF，自身 OK，屏蔽 LF
+            
             mask[sl_all_hf, sl_lr] = False
             mask[sl_all_hf, sl_all_hf] = False
-            # mask[sl_all_hf, sl_lf] 保持 True（屏蔽）
+            
 
         elif mode == 'causal':
-            # causal：只允许看过去（含自己）
+            
             causal = torch.triu(
                 torch.ones((total_len, total_len),
                         dtype=torch.bool,
@@ -554,10 +486,8 @@ class BackboneModel(nn.Module):
     def forward(self, x,t,features):
         
 
-        # 1. 基础维度获取与时间嵌入处理
         B, L, K = x.shape
-        # x = self.revin(x, 'norm')
-        # 提取特征中的参考信号 (pseudo_x0) 与原始信号
+
         pure_x0 = features[:, :, :, -1]
         ori_x0 = pure_x0
   
@@ -576,10 +506,7 @@ class BackboneModel(nn.Module):
         t = repeat(t, 'b 1 -> (b k) 1', b=B, k=K)
         t_emb = self.time_embedding(t).squeeze(1)  # [B*K, D]
 
-        # -------------------------------------------------------
-        # 2. 小波分解与分箱 (DWT Decomposition)
-        # -------------------------------------------------------
-        # 对参考信号和原始输入进行小波分解
+
         x_lr, _ = self.dwt1(pure_x0.permute(0, 2, 1), is_dec=True) 
         n_ll, n_yh = self.dwt(x.permute(0, 2, 1), is_dec=True)
 
@@ -590,12 +517,6 @@ class BackboneModel(nn.Module):
         Need_pad_len_lf = (self._max_patch_num - 1) * self.stride + self.base_patch_size - n_ll.shape[-1]
        
 
-        # -------------------------------------------------------
-        # 3. Tokenization (序列化)
-        # -------------------------------------------------------
-        # 原始信号、低频分支(LR, LF)的 Tokenize
-
-        # tok_ori = self.ori_tokenizer(ori_x0, Need_pad_len_ori, stride=_max_patch_size // 2)
         
 
         tok_ori = self.ori_tokenizer(ori_x0, 0, stride=self.ori_stride) 
@@ -620,13 +541,6 @@ class BackboneModel(nn.Module):
             tok = tok + self.add_level_emb(tok,3 + i) 
             band_tokens.append(tok)
 
-        # -------------------------------------------------------
-        # 4. 掩码准备与条件构建
-        # -------------------------------------------------------
-        # 拼接低频 Tokens 并记录切片信息
-
-        # tok_lr = tok_lr + self.add_level_emb(tok_lr,1) + t_emb.unsqueeze(1)
-        # tok_lf = tok_lf + self.add_level_emb(tok_lf,2) + t_emb.unsqueeze(1)
 
         tok_lr = tok_lr + self.add_level_emb(tok_lr,1) 
         tok_lf = tok_lf + self.add_level_emb(tok_lf,2) 
@@ -640,25 +554,19 @@ class BackboneModel(nn.Module):
             'lf': slice(len_lr, len_lr + len_lf)
         }
 
-        # 构建因果掩码和低频掩码
         mask_causal = self._make_mask(tok_ori, slice_info, mode='causal')
         mask_low = self._make_mask(tok_l, slice_info, mode='low')
 
-        # 融合时间与特征作为 Conditioning (c_lr)
-  
+
         c_global = t_emb + tok_feat
         
 
-        # -------------------------------------------------------
-        # 5. 多级解码 (Hierarchical Decoding)
-        # -------------------------------------------------------
-        # Phase 1: Global Decoding (处理原始信号 Token)
+
         global_x = tok_ori
         for layer in self.Glob_layers:
             global_x = layer(global_x, c_global, attn_mask=mask_causal)
 
 
-        # latent_emb = self.latent_emb(rearrange(global_x,'(b c) L N -> b (L N) c',b=b,c=c))
 
         latent_emb = self.latent_emb(global_x.permute(0,2,1)).squeeze(-1)
  
@@ -693,9 +601,7 @@ class BackboneModel(nn.Module):
         for layer in self.HDDec_layers:
             out_hd = layer(out_hd, c_hd, attn_mask=mask_high)
 
-        # -------------------------------------------------------
-        # 6. 信号重构 (Signal Reconstruction)
-        # -------------------------------------------------------
+
         # 提取低频预测
         lf_pre = out_le[:, slice_info['lf'], :]
         lr_pre = out_hd[:, slice_info['lf'], :]
@@ -711,7 +617,7 @@ class BackboneModel(nn.Module):
         offset = hf_cut
         rec_hfs = []
         for i, sl in enumerate(hf_slices):
-            # 计算相对于 hf_pre_tokens 的新切片索引
+            
             rel_sl = slice(sl.start - offset, sl.stop - offset)
             hf_feat = hf_pre_tokens[:, rel_sl, :]
             
