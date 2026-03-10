@@ -1,0 +1,60 @@
+# lightning==2.3.0.dev0
+seed_everything: 1
+trainer:
+  accelerator: gpu
+  devices: 1
+  strategy: auto
+  max_epochs: 50
+  use_distributed_sampler: true
+  limit_train_batches: 100
+  log_every_n_steps: 10
+  check_val_every_n_epoch: 1
+  default_root_dir: ./results
+  accumulate_grad_batches: 1
+  gradient_clip_val: 0.5
+  num_sanity_val_steps: 0
+  inference_mode: true
+model:
+  forecaster:
+    class_path: probts.model.forecaster.prob_forecaster.TSflow_cond_ms
+    init_args:
+      timesteps: 16
+      hidden_dim: 64
+      use_lags: false
+      feat_idx_emb_dim: 1
+      use_scaling: false
+      num_samples: 100
+      nheads : 8
+      mlp_ratio: 4
+      wavelet_level: 1
+      base_patch_size: 8
+      ori_patch_size: 8
+      attn_drop: 0.1
+      proj_drop: 0.1
+      use_ema: false
+      ema_params:
+        beta: 0.999
+        update_after_step: 100
+        update_every: 1
+      prior_params:
+        kernel: "pe"
+        gamma: 1.0
+        context_freqs: 7
+  set_global_grad: true
+  num_samples: 100
+  learning_rate: 0.001
+  quantiles_num: 20
+data:
+  data_manager:
+    class_path: probts.data.data_manager.DataManager
+    init_args:
+      dataset: etth2
+      split_val: true
+      scaler: temporal # identity, standard, temporal
+      context_length: 24
+      prediction_length: 24
+  batch_size: 32
+  test_batch_size: 32
+  num_workers: 8
+
+
