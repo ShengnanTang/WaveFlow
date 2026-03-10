@@ -40,4 +40,4 @@ Special thanks to the **authors and contributors** of the following repository:
 ## Contact
 
 If you have any questions or suggestions, feel free to contact:
--tsn@zju.edu.cn
+tsn@zju.edu.cn
