@@ -32,8 +32,12 @@ bash config/hyper_parameters_search/electricity/electricity_waveflow_seed_0.sh
 ```
 
 ## Community Support | Acknowledgements
-
 This project is built on the shoulders of the open-source community.  
-Special thanks to the authors and contributors of the following repositorie:
+Special thanks to the **authors and contributors** of the following repository:
 
--https://github.com/decisionintelligence/K2VAE/tree/master
+- **[K2VAE](https://github.com/decisionintelligence/K2VAE/tree/master)**
+
+## Contact
+
+If you have any questions or suggestions, feel free to contact:
+-tsn@zju.edu.cn
