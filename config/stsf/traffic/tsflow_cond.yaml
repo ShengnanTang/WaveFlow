@@ -1,0 +1,56 @@
+# lightning==2.3.0.dev0
+seed_everything: 6432
+trainer:
+  accelerator: gpu
+  devices: 5
+  strategy: ddp_find_unused_parameters_true
+  max_epochs: 20
+  use_distributed_sampler: true
+  limit_train_batches: 128
+  log_every_n_steps: 1
+  check_val_every_n_epoch: 1
+  default_root_dir: ./results
+  accumulate_grad_batches: 1
+  gradient_clip_val: 0.5
+  num_sanity_val_steps: 1
+  inference_mode: false
+model:
+  forecaster:
+    class_path: probts.model.forecaster.prob_forecaster.TSflow_cond
+    init_args:
+      timesteps: 32
+      hidden_dim: 64
+      step_emb: 64
+      num_residual_blocks: 3
+      dropout: 0.0
+      use_ema: false
+      use_lags: false
+      feat_idx_emb_dim: 1
+      use_scaling: false
+      init_skip: false
+      feature_skip: true
+      num_samples: 16
+      ema_params:
+        beta: 0.9999
+        update_after_step: 128
+        update_every: 1
+      prior_params:
+        kernel: pe
+        gamma: 1.0
+        context_freqs: 14
+  num_samples: 16
+  learning_rate: 0.001
+  quantiles_num: 20
+data:
+  data_manager:
+    class_path: probts.data.data_manager.DataManager
+    init_args:
+      dataset: traffic_nips
+      split_val: true
+      scaler: temporal # identity, standard, temporal
+      
+  batch_size: 32
+  test_batch_size: 32
+  num_workers: 8
+
+
