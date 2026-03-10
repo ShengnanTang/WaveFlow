@@ -1,7 +1,7 @@
 This code is the official PyTorch implementation of our Paper: WaveFlow: Hierarchical Frequency-Decoupled Flow
 Matching for Probabilistic Time Series Forecasting .
 
-If you find this project helpful, please don't forget to give it a ⭐ Star to show your support. Thank you!
+If you find this project useful, star it ⭐! Thanks for your support.
 
 
 ## Quickstart
