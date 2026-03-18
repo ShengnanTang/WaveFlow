@@ -37,7 +37,4 @@ Special thanks to the **authors and contributors** of the following repository:
 
 - **[K2VAE](https://github.com/decisionintelligence/K2VAE/tree/master)**
 
-## Contact
 
-If you have any questions or suggestions, feel free to contact:
-tsn@zju.edu.cn
