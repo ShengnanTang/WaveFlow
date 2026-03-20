@@ -637,23 +637,16 @@ class BackboneModel(nn.Module):
         return (out.permute(0,2,1))
 
     def _decode_branch(self, tokens, c_lr, branch_type="global", idx=None):
-            """
-            通用解码函数
-            branch_type: "global", "low_freq", 或 "high_freq"
-            """
-            # 1. 根据类型动态获取对应的 detokenizer
+
             if branch_type == "high_freq":
-                # 高频分支需要索引 idx
+                
                 detokenizer = self.high_freq_detokenizers[idx]
             else:
-                # 低频和全局分支
+                
                 attr_name = f"{branch_type}_detokenizers"
                 detokenizer = getattr(self, attr_name)
 
-            # 2. 统一执行反序列化逻辑
             x = detokenizer(tokens, c_lr)
-
-            # 3. 统一执行维度重排
             x = rearrange(x, '(b k) l -> b k l', k=self.c_in)
             
             return x
